@@ -35,7 +35,7 @@ def scan_host(q):
             ip, ports = q.get_nowait()
         except queue.Empty:
             break
-        sslcontext = ssl._create_unverified_context()   # using ssl.create_default_context() makes the handshake fail
+        sslcontext = ssl.create_default_context()
         sslcontext.check_hostname = False
 
         for port in ports:

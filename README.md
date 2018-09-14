@@ -25,3 +25,11 @@ You can pass multiple IP addresses and ports by separating them with a comma:
 ```
 
 The default number of threads is 5, this seems to be more than enough on a LAN.
+
+## Example run
+
+```
+$ /tlsresolver.py -p 443 -i 50.31.169.131
+50.31.169.131: ['*.arstechnica.com', '*.arstechnica.co.uk', 'arstechnica.co.uk', 'arstechnica.com']
+
+```
