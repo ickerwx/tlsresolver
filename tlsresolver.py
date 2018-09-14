@@ -3,13 +3,12 @@
 import argparse
 import sys
 import ipaddress as ipa
-from threading import Thread, Lock
+import threading
 import queue
 import time
 import socket
 import ssl
 
-# TODO: input file with ip:p1,p2,p3 lines
 # TODO: import nmap XML or greppable
 # TODO: implement actual support for IPv6
 # TODO: pretty-print the results
@@ -21,9 +20,12 @@ def parse_args():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      argument_default=argparse.SUPPRESS)
 
-    parser.add_argument('-i', '--ip', dest='ipaddresses',
-                        help='comma-separated list of IP addresses (e.g. 127.0.0.1,fe80::)',
-                        required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('-i', '--ip', dest='ipaddresses',
+                       help='comma-separated list of IP addresses (e.g. 127.0.0.1,fe80::)')
+    group.add_argument('-f', '--file', dest='file',
+                       help='file containing host:port1,port2,... lines, one line per host')
     parser.add_argument('-p', '--ports', dest='ports', help='comma-separated list of ports',
                         default='443,636,993,995,8443')
     parser.add_argument('-t', '--threads', dest='threads', type=int, default=5,
@@ -44,7 +46,6 @@ def scan_host(q):
         sslcontext.check_hostname = False
 
         names = []
-
         for port in ports:
             try:
                 if type(ip) is ipa.IPv6Address:
@@ -53,6 +54,7 @@ def scan_host(q):
                     s.connect((str(ip), port, 0, 0))
                 else:
                     s = sslcontext.wrap_socket(socket.socket())
+                    s.settimeout(1)
                     s.connect((str(ip), port))
 
                 cert = s.getpeercert()
@@ -66,19 +68,12 @@ def scan_host(q):
                     for key, val in cert['subjectAltName']:
                         if key.lower() == 'dns' and val.lower() not in names:
                             names.append(val.lower())
-            except (ssl.SSLError, ConnectionRefusedError):
+            except (ssl.SSLError, ConnectionRefusedError, socket.timeout, OSError):
                 # something broke, or the port does not do TLS, we just skip it
                 pass
         resolved[ip] = names
     for i in resolved.keys():
-        mprint(str(i) + ": " + str(resolved[i]))
-
-
-def mprint(msg):
-    # this function will aquire a mutex before printing to avoid mixing thread output
-    global_print_mutex.acquire()
-    print(msg)
-    global_print_mutex.release()
+        print(str(i) + ": " + str(resolved[i]))
 
 
 def main():
@@ -86,46 +81,57 @@ def main():
     # then it just periodically checks if the queue is empty and if all threads are finished
     # if this happens, the program exits
     args = parse_args()
+
+    # all targets are written to a queue. Each thread will pick the next available target from the queue.
+    target_queue = queue.Queue()
+
     try:
-        ipaddresses = [ipa.ip_address(i) for i in args.ipaddresses.split(',')]
-        ports = set([int(p) for p in args.ports.split(',')])  # convert list comprehension to set to get unique values
+        if 'ipaddresses' in args:
+            ipaddresses = [ipa.ip_address(i) for i in args.ipaddresses.split(',')]
+            ports = set([int(p) for p in args.ports.split(',')])  # convert list comprehension to set for unique values
+            for ip in ipaddresses:
+                # put (ip, ports) tuples into the queue. each thread will process the next available tuple
+                target_queue.put((ip, ports))
+        else:
+            lines = [l.strip() for l in open(args.file, 'r').readlines()]
+            for line in lines:
+                if ':' in line:
+                    ip, ports = line.split(':')
+                else:
+                    ip = line
+                    ports = args.ports
+                ip = ipa.ip_address(ip)
+                ports = set([int(p) for p in ports.split(',')])  # convert list comprehension to set for unique values
+                target_queue.put((ip, ports))
     except Exception as e:
         print('Error: %s' % e, file=sys.stderr)
         sys.exit(1)
 
-    # all targets are written to a queue. Each thread will pick the next available target from the queue.
-    target_queue = queue.Queue()
-    for ip in ipaddresses:
-        # put (ip, ports) tuples into the queue. each thread will process the next available tuple
-        target_queue.put((ip, ports))
-
     # create args.threads threads, start them and add them to the list
     threads = []
     for i in range(args.threads):
-        t = Thread(target=scan_host, args=(target_queue,))
+        t = threading.Thread(target=scan_host, args=(target_queue,))
         t.start()
         threads.append(t)
 
     while True:
         try:
             # periodically check if the queue still contains targets and if the threads are still running
-            time.sleep(1)
+            time.sleep(0.5)
             if target_queue.empty() and True not in [t.is_alive() for t in threads]:
                 # queue is empty and all threads are done, we can safely exit
                 sys.exit(0)
 
         except KeyboardInterrupt:
             # Ctrl+C was pressed: empty the queue and wait for the threads to finish
+            # each thread will return once the queue is empty
             while not target_queue.empty():
                 try:
                     target_queue.get(block=False)
                 except queue.Empty:
                     pass
-            for t in threads:
-                t.join()
             sys.exit(0)
 
 
-global_print_mutex = Lock()
 if __name__ == '__main__':
     main()
