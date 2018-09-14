@@ -17,12 +17,15 @@ import ssl
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Retrieve hostnames from TLS certificates')
+    parser = argparse.ArgumentParser(description='Retrieve hostnames from TLS certificates',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     argument_default=argparse.SUPPRESS)
 
     parser.add_argument('-i', '--ip', dest='ipaddresses',
                         help='comma-separated list of IP addresses (e.g. 127.0.0.1,fe80::)',
                         required=True)
-    parser.add_argument('-p', '--ports', dest='ports', help='comma-separated list of ports', required=True)
+    parser.add_argument('-p', '--ports', dest='ports', help='comma-separated list of ports',
+                        default='443,636,993,995,8443')
     parser.add_argument('-t', '--threads', dest='threads', type=int, default=5,
                         help='set number of threads')
 
@@ -30,37 +33,45 @@ def parse_args():
 
 
 def scan_host(q):
+    resolved = {}
     while not q.empty():
         try:
             ip, ports = q.get_nowait()
         except queue.Empty:
             break
+
         sslcontext = ssl.create_default_context()
         sslcontext.check_hostname = False
 
+        names = []
+
         for port in ports:
-            if type(ip) is ipa.IPv6Address:
-                s = sslcontext.wrap_socket(socket.socket(socket.AF_INET6))
-                # this does not work atm, I need to figure out what the tuple actually means
-                s.connect((str(ip), port, 0, 0))
-            else:
-                s = sslcontext.wrap_socket(socket.socket())
-                s.connect((str(ip), port))
+            try:
+                if type(ip) is ipa.IPv6Address:
+                    s = sslcontext.wrap_socket(socket.socket(socket.AF_INET6))
+                    # this does not work atm, I need to figure out what the tuple actually means
+                    s.connect((str(ip), port, 0, 0))
+                else:
+                    s = sslcontext.wrap_socket(socket.socket())
+                    s.connect((str(ip), port))
 
-            cert = s.getpeercert()
-            names = []
-            if 'subject' in cert.keys():
-                for tup in cert['subject']:
-                    for key, val in tup:
-                        if key.lower() == 'commonname' and val.lower() not in names:
+                cert = s.getpeercert()
+                if 'subject' in cert.keys():
+                    for tup in cert['subject']:
+                        for key, val in tup:
+                            if key.lower() == 'commonname' and val.lower() not in names:
+                                names.append(val.lower())
+
+                if 'subjectAltName' in cert.keys():
+                    for key, val in cert['subjectAltName']:
+                        if key.lower() == 'dns' and val.lower() not in names:
                             names.append(val.lower())
-
-            if 'subjectAltName' in cert.keys():
-                for key, val in cert['subjectAltName']:
-                    if key.lower() == 'dns' and val.lower() not in names:
-                        names.append(val.lower())
-
-            mprint(str(ip) + ": " + str(names))
+            except (ssl.SSLError, ConnectionRefusedError):
+                # something broke, or the port does not do TLS, we just skip it
+                pass
+        resolved[ip] = names
+    for i in resolved.keys():
+        mprint(str(i) + ": " + str(resolved[i]))
 
 
 def mprint(msg):

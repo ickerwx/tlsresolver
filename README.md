@@ -3,7 +3,7 @@ Enumerate host names by parsing TLS certificates (CN and SAN)
 
 ```
 $ ./tlsresolver.py -h
-usage: tlsresolver.py [-h] -i IPADDRESSES -p PORTS [-t THREADS]
+usage: tlsresolver.py [-h] -i IPADDRESSES [-p PORTS] [-t THREADS]
 
 Retrieve hostnames from TLS certificates
 
@@ -13,9 +13,10 @@ optional arguments:
                         comma-separated list of IP addresses (e.g.
                         127.0.0.1,fe80::)
   -p PORTS, --ports PORTS
-                        comma-separated list of ports
+                        comma-separated list of ports (default:
+                        443,636,993,995,8443)
   -t THREADS, --threads THREADS
-                        set number of threads
+                        set number of threads (default: 5)
 ```
 
 You can pass multiple IP addresses and ports by separating them with a comma:
@@ -29,7 +30,6 @@ The default number of threads is 5, this seems to be more than enough on a LAN.
 ## Example run
 
 ```
-$ /tlsresolver.py -p 443 -i 50.31.169.131
-50.31.169.131: ['*.arstechnica.com', '*.arstechnica.co.uk', 'arstechnica.co.uk', 'arstechnica.com']
-
+$ ./tlsresolver.py -p 443 -i 93.184.216.34
+93.184.216.34: ['www.example.org', 'example.com', 'example.edu', 'example.net', 'example.org', 'www.example.com', 'www.example.edu', 'www.example.net']
 ```
