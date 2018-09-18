@@ -44,6 +44,7 @@ def scan_host(q):
 
         sslcontext = ssl.create_default_context()
         sslcontext.check_hostname = False
+        sslcontext.verify_mode = ssl.CERT_NONE
 
         names = []
         for port in ports:
