@@ -95,8 +95,11 @@ def main():
         else:
             lines = [l.strip() for l in open(args.file, 'r').readlines()]
             for line in lines:
-                if ':' in line:
-                    ip, ports = line.split(':')
+                if ' ' in line:
+                    ip, ports = line.split(' ', 1)
+                    if len(ports.strip() == 0):
+                        # the line contained spaces but nothing after, so use default ports instead
+                        ports = args.ports
                 else:
                     ip = line
                     ports = args.ports

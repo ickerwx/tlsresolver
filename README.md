@@ -34,9 +34,9 @@ You can also query IPv6 addresses, and query a mix of IPv6 and IPv4 addresses. T
 ```
 $ cat examplefile
 1.1.1.1
-2.2.2.2:22
-3.3.3.3:33,333
-4.4.4.4:44,444,4444
+2.2.2.2 22
+3.3.3.3 33,333
+4.4.4.4 44,444,4444
 ```
 
 If you don't specify ports in the file, then the program will use either the default ports or whatever you specify with `-p`.
