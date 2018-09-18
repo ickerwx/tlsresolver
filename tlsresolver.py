@@ -50,7 +50,7 @@ def scan_host(q):
             try:
                 if type(ip) is ipa.IPv6Address:
                     s = sslcontext.wrap_socket(socket.socket(socket.AF_INET6))
-                    # this does not work atm, I need to figure out what the tuple actually means
+                    # I had mixed success with IPv6, but on a my dual-stack system it seemed to work fine
                     s.connect((str(ip), port, 0, 0))
                 else:
                     s = sslcontext.wrap_socket(socket.socket())

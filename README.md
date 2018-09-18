@@ -27,7 +27,7 @@ You can pass multiple IP addresses and ports by separating them with a comma:
 -i 127.0.0.1,127.0.0.2 -p 1,2,3,4,5
 ```
 
-The default number of threads is 5, this seems to be more than enough on a LAN.
+You can also query IPv6 addresses, and query a mix of IPv6 and IPv4 addresses. The default number of threads is 5, this seems to be more than enough on a LAN.
 
 ## Input file format
 
@@ -44,6 +44,7 @@ If you don't specify ports in the file, then the program will use either the def
 ## Example run
 
 ```
-$ ./tlsresolver.py -p 443 -i 93.184.216.34
+$ ./tlsresolver.py -p 443 -i 93.184.216.34,2606:2800:220:1:248:1893:25c8:1946
+2606:2800:220:1:248:1893:25c8:1946: ['www.example.org', 'example.com', 'example.edu', 'example.net', 'example.org', 'www.example.com', 'www.example.edu', 'www.example.net']
 93.184.216.34: ['www.example.org', 'example.com', 'example.edu', 'example.net', 'example.org', 'www.example.com', 'www.example.edu', 'www.example.net']
 ```
