@@ -64,7 +64,9 @@ def scan_host(q):
                 # parse the subject out of the certificate
                 for elem in cert.get_subject().get_components():
                     if elem[0] == b'CN':
-                        names.append(elem[1].decode())
+                        name = elem[1].decode()
+                        if name not in names:
+                            names.append(name)
 
                 extension_count = cert.get_extension_count()
                 if extension_count > 0:
