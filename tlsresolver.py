@@ -8,6 +8,7 @@ import queue
 import time
 import socket
 import ssl
+from OpenSSL import crypto
 
 # TODO: import nmap XML or greppable
 # TODO: implement actual support for IPv6
@@ -58,17 +59,23 @@ def scan_host(q):
                     s.settimeout(1)
                     s.connect((str(ip), port))
 
-                cert = s.getpeercert()
-                if 'subject' in cert.keys():
-                    for tup in cert['subject']:
-                        for key, val in tup:
-                            if key.lower() == 'commonname' and val.lower() not in names:
-                                names.append(val.lower())
+                cert = crypto.load_certificate(crypto.FILETYPE_ASN1, s.getpeercert(True))
 
-                if 'subjectAltName' in cert.keys():
-                    for key, val in cert['subjectAltName']:
-                        if key.lower() == 'dns' and val.lower() not in names:
-                            names.append(val.lower())
+                # parse the subject out of the certificate
+                for elem in cert.get_subject().get_components():
+                    if elem[0] == b'CN':
+                        names.append(elem[1].decode())
+
+                extension_count = cert.get_extension_count()
+                if extension_count > 0:
+                    for count in range(extension_count):
+                        extension = cert.get_extension(count)
+                        if extension.get_short_name().decode() == 'subjectAltName':
+                            values = extension.__str__().split()
+                            for value in values:
+                                name = value.strip('DNS:').strip(',')
+                                if name not in names:
+                                    names.append(name)
             except (ssl.SSLError, ConnectionRefusedError, socket.timeout, OSError):
                 # something broke, or the port does not do TLS, we just skip it
                 pass
@@ -98,7 +105,7 @@ def main():
             for line in lines:
                 if ' ' in line:
                     ip, ports = line.split(' ', 1)
-                    if len(ports.strip() == 0):
+                    if len(ports.strip()) == 0:
                         # the line contained spaces but nothing after, so use default ports instead
                         ports = args.ports
                 else:
