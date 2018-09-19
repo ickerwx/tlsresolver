@@ -11,7 +11,6 @@ import ssl
 from OpenSSL import crypto
 
 # TODO: import nmap XML or greppable
-# TODO: implement actual support for IPv6
 # TODO: pretty-print the results
 # TODO: sqlite storage, then output data in different formats (csv, json)
 
@@ -24,7 +23,7 @@ def parse_args():
     group = parser.add_mutually_exclusive_group(required=True)
 
     group.add_argument('-i', '--ip', dest='ipaddresses',
-                       help='comma-separated list of IP addresses (e.g. 127.0.0.1,fe80::)')
+                       help='comma-separated list of IP addresses or CIDR networks (e.g. 127.0.0.1,fe80::,1.2.3.0/24)')
     group.add_argument('-f', '--file', dest='file',
                        help='file containing host:port1,port2,... lines, one line per host')
     parser.add_argument('-p', '--ports', dest='ports', help='comma-separated list of ports',
@@ -59,6 +58,10 @@ def scan_host(q):
                     s.settimeout(1)
                     s.connect((str(ip), port))
 
+                # I needed to use OpenSSL instead of the dict returned by getpeercert
+                # It turned out that I have to set verify_mode to ssl.CERT_NONE (see above),
+                # but with this set, s.getpeercert() returns an empty dict. So I fetch the binary cert
+                # and parse it using OpenSSL
                 cert = crypto.load_certificate(crypto.FILETYPE_ASN1, s.getpeercert(True))
 
                 # parse the subject out of the certificate
@@ -68,11 +71,18 @@ def scan_host(q):
                         if name not in names:
                             names.append(name)
 
+                # check for SAN extensions
                 extension_count = cert.get_extension_count()
                 if extension_count > 0:
                     for count in range(extension_count):
                         extension = cert.get_extension(count)
                         if extension.get_short_name().decode() == 'subjectAltName':
+                            # finding a parser for the ASN.1 sequence returned by extension.get_data() proved
+                            # surprisingly difficult. It looks reasonably easy for this particular sequence, but ASN.1
+                            # has somewhat of a reputation, so I'd rather not write my own parser.
+
+                            # extension.__str__() looks like 'DNS:host.tld, DNS:host2.tld, DNS:host3.tld'
+                            # split it, ten get rid of the comma and the DNS: prefix to extract the name
                             values = extension.__str__().split()
                             for value in values:
                                 name = value.strip('DNS:').strip(',')
@@ -97,11 +107,15 @@ def main():
 
     try:
         if 'ipaddresses' in args:
-            ipaddresses = [ipa.ip_address(i) for i in args.ipaddresses.split(',')]
+            items = [i for i in args.ipaddresses.split(',')]
             ports = set([int(p) for p in args.ports.split(',')])  # convert list comprehension to set for unique values
-            for ip in ipaddresses:
-                # put (ip, ports) tuples into the queue. each thread will process the next available tuple
-                target_queue.put((ip, ports))
+            for item in items:
+                if '/' in item:
+                    network = ipa.ip_network(item, strict=False)
+                    for host in network.hosts():
+                        target_queue.put((host, ports))
+                else:
+                    target_queue.put((ipa.ip_address(item), ports))
         else:
             lines = [l.strip() for l in open(args.file, 'r').readlines()]
             for line in lines:
@@ -113,9 +127,15 @@ def main():
                 else:
                     ip = line
                     ports = args.ports
-                ip = ipa.ip_address(ip)
                 ports = set([int(p) for p in ports.split(',')])  # convert list comprehension to set for unique values
-                target_queue.put((ip, ports))
+                if '/' in ip:
+                    print(ip)
+                    network = ipa.ip_network(ip, strict=False)
+                    for host in network.hosts():
+                        target_queue.put((host, ports))
+                else:
+                    ip = ipa.ip_address(ip)
+                    target_queue.put((ip, ports))
     except Exception as e:
         print('Error: %s' % e, file=sys.stderr)
         sys.exit(1)
