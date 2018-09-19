@@ -25,7 +25,7 @@ def parse_args():
     group.add_argument('-i', '--ip', dest='ipaddresses',
                        help='comma-separated list of IP addresses or CIDR networks (e.g. 127.0.0.1,fe80::,1.2.3.0/24)')
     group.add_argument('-f', '--file', dest='file',
-                       help='file containing host:port1,port2,... lines, one line per host')
+                       help='file containing host port1,port2,... lines, one line per host (see README)')
     parser.add_argument('-p', '--ports', dest='ports', help='comma-separated list of ports',
                         default='443,636,993,995,8443')
     parser.add_argument('-t', '--threads', dest='threads', type=int, default=5,
