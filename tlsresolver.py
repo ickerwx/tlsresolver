@@ -30,11 +30,13 @@ def parse_args():
                         default='443,636,993,995,8443')
     parser.add_argument('-t', '--threads', dest='threads', type=int, default=5,
                         help='set number of threads')
+    parser.add_argument('-to', '--timeout', dest='timeout', type=float, default=1.0,
+                        help='socket timeout')
 
     return parser.parse_args()
 
 
-def scan_host(q):
+def scan_host(q, args):
     resolved = {}
     while not q.empty():
         try:
@@ -55,7 +57,7 @@ def scan_host(q):
                     s.connect((str(ip), port, 0, 0))
                 else:
                     s = sslcontext.wrap_socket(socket.socket())
-                    s.settimeout(1)
+                    s.settimeout(args.timeout)
                     s.connect((str(ip), port))
 
                 # I needed to use OpenSSL instead of the dict returned by getpeercert
@@ -143,7 +145,7 @@ def main():
     # create args.threads threads, start them and add them to the list
     threads = []
     for i in range(args.threads):
-        t = threading.Thread(target=scan_host, args=(target_queue,))
+        t = threading.Thread(target=scan_host, args=(target_queue, args))
         t.start()
         threads.append(t)
 
