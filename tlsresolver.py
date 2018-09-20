@@ -32,6 +32,8 @@ def parse_args():
                         help='set number of threads')
     parser.add_argument('-to', '--timeout', dest='timeout', type=float, default=1.0,
                         help='socket timeout')
+    parser.add_argument('-v', '--verbose', dest='verbose', default=False, action='store_true',
+                        help='Print empty results')
 
     return parser.parse_args()
 
@@ -95,7 +97,11 @@ def scan_host(q, args):
                 pass
         resolved[ip] = names
     for i in resolved.keys():
-        print(str(i) + ": " + str(resolved[i]))
+        if args.verbose is True:
+            print(str(i) + ": " + str(resolved[i]))
+        else:
+            if len(resolved[i]) > 0:
+                print(str(i) + ": " + str(resolved[i]))
 
 
 def main():

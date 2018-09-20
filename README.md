@@ -3,12 +3,6 @@ Enumerate host names by parsing TLS certificates (CN and SAN)
 
 ```
 $ ./tlsresolver.py -h
-usage: tlsresolver.py [-h] (-i IPADDRESSES | -f FILE) [-p PORTS] [-t THREADS]
-                      [-to TIMEOUT]
-
-Retrieve hostnames from TLS certificates
-
-optional arguments:
   -h, --help            show this help message and exit
   -i IPADDRESSES, --ip IPADDRESSES
                         comma-separated list of IP addresses or CIDR networks
@@ -22,6 +16,7 @@ optional arguments:
                         set number of threads (default: 5)
   -to TIMEOUT, --timeout TIMEOUT
                         socket timeout (default: 1.0)
+  -v, --verbose         Print empty results (default: False)
 ```
 
 You can pass multiple IP addresses, networks and ports by separating them with a comma:
